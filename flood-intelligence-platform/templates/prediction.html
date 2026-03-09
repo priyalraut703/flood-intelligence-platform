@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Flood Prediction — FloodIQ Delhi{% endblock %}
+{% block page_title %}Flood Prediction{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-info">
+    <h1>ML Flood Risk Prediction</h1>
+    <p>Random Forest model predicting flood risk across 120 Delhi wards</p>
+  </div>
+  <div class="page-header-actions">
+    <button class="btn btn-primary btn-sm" onclick="predictAll()">
+      <i class="fas fa-brain"></i> Run Prediction
+    </button>
+    <button class="btn btn-secondary btn-sm" onclick="exportCSV()">
+      <i class="fas fa-download"></i> Export
+    </button>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:320px 1fr;gap:16px;margin-bottom:16px">
+  <!-- Predict Panel -->
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <div class="card">
+      <div class="card-title">Custom Prediction <span>Manual Input</span></div>
+      <div class="form-group">
+        <label class="form-label">Rainfall (mm)</label>
+        <input type="number" class="form-input" id="inRainfall" value="100" min="10" max="250"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Elevation (m)</label>
+        <input type="number" class="form-input" id="inElevation" value="215" min="170" max="290"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Drain Capacity (0–1)</label>
+        <input type="number" class="form-input" id="inDrain" value="0.5" min="0.1" max="1.0" step="0.05"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Population Density</label>
+        <input type="number" class="form-input" id="inPop" value="20000" min="1000" max="50000"/>
+      </div>
+      <button class="btn btn-primary" style="width:100%" onclick="runCustomPredict()">
+        <i class="fas fa-play"></i> Predict Risk
+      </button>
+      
+      <!-- Result -->
+      <div id="predictResult" style="margin-top:16px;display:none">
+        <div style="background:var(--bg-card2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;text-align:center">
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">PREDICTED RISK LEVEL</div>
+          <div id="resultRisk" style="font-family:Syne,sans-serif;font-size:28px;font-weight:800;margin-bottom:4px"></div>
+          <div id="resultConf" style="font-size:12px;color:var(--text-muted)"></div>
+          <div id="resultBar" style="margin-top:10px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Model Info -->
+    <div class="card">
+      <div class="card-title">Model Info</div>
+      <div class="info-row"><span class="info-row-label">Algorithm</span><span class="info-row-val">Random Forest</span></div>
+      <div class="info-row"><span class="info-row-label">Training Samples</span><span class="info-row-val">500</span></div>
+      <div class="info-row"><span class="info-row-label">Accuracy</span><span class="info-row-val" style="color:var(--success)">98.6%</span></div>
+      <div class="info-row"><span class="info-row-label">Features</span><span class="info-row-val">4</span></div>
+      <div class="info-row"><span class="info-row-label">Classes</span><span class="info-row-val">LOW / MED / HIGH</span></div>
+    </div>
+  </div>
+
+  <!-- Map + Table -->
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <div class="card" style="padding:16px">
+      <div class="card-title">Ward Risk Map <span id="mapSubtitle">All wards</span></div>
+      <div class="map-container" style="height:320px">
+        <div id="predMap"></div>
+      </div>
+      <div class="risk-legend" style="margin-top:10px">
+        <div class="legend-item"><div class="legend-dot high"></div> High Risk</div>
+        <div class="legend-item"><div class="legend-dot medium"></div> Medium Risk</div>
+        <div class="legend-item"><div class="legend-dot low"></div> Low Risk</div>
+        <button class="btn btn-secondary btn-sm" style="margin-left:auto" onclick="filterRisk('ALL')">All</button>
+        <button class="btn btn-sm" style="background:rgba(239,68,68,0.15);color:var(--danger);border:1px solid rgba(239,68,68,0.25)" onclick="filterRisk('HIGH')">High</button>
+        <button class="btn btn-sm" style="background:rgba(245,158,11,0.15);color:var(--warning);border:1px solid rgba(245,158,11,0.25)" onclick="filterRisk('MEDIUM')">Medium</button>
+      </div>
+    </div>
+
+    <!-- Ward Table -->
+    <div class="card">
+      <div class="card-title">Ward Risk Table <span id="tableCount"></span></div>
+      <div class="table-wrapper" id="wardTable">
+        <div class="loading"><div class="spinner"></div> Loading...</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/prediction.js') }}"></script>
+<script>
+let pMap = window.pMap, pWardsLayer = window.pWardsLayer;
+let allWards = window.allWards || [];
+let currentFilter = 'ALL';
+
+// All logic handled by prediction.js (loaded above)
+</script>
+{% endblock %}

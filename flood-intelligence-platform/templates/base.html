@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}Delhi Flood Intelligence Platform{% endblock %}</title>
+  
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+  
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  
+  <!-- App CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+  
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">
+      <i class="fas fa-water"></i>
+    </div>
+    <div class="logo-text">
+      <span class="logo-main">FloodIQ</span>
+      <span class="logo-sub">Delhi Intelligence</span>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="nav-group">
+      <span class="nav-label">MAIN</span>
+      <a href="/" class="nav-item {% if active=='dashboard' %}active{% endif %}">
+        <span class="nav-icon"><i class="fas fa-gauge-high"></i></span>
+        <span class="nav-text">Dashboard</span>
+        {% if active=='dashboard' %}<span class="nav-badge live">LIVE</span>{% endif %}
+      </a>
+      <a href="/prediction" class="nav-item {% if active=='prediction' %}active{% endif %}">
+        <span class="nav-icon"><i class="fas fa-brain"></i></span>
+        <span class="nav-text">Flood Prediction</span>
+      </a>
+      <a href="/simulation" class="nav-item {% if active=='simulation' %}active{% endif %}">
+        <span class="nav-icon"><i class="fas fa-play-circle"></i></span>
+        <span class="nav-text">Simulation</span>
+      </a>
+    </div>
+    <div class="nav-group">
+      <span class="nav-label">INSIGHTS</span>
+      <a href="/analytics" class="nav-item {% if active=='analytics' %}active{% endif %}">
+        <span class="nav-icon"><i class="fas fa-chart-line"></i></span>
+        <span class="nav-text">Analytics</span>
+      </a>
+      <a href="/resources" class="nav-item {% if active=='resources' %}active{% endif %}">
+        <span class="nav-icon"><i class="fas fa-truck-medical"></i></span>
+        <span class="nav-text">Resources</span>
+      </a>
+    </div>
+    <div class="nav-group">
+      <span class="nav-label">SYSTEM</span>
+      <a href="/alerts" class="nav-item {% if active=='alerts' %}active{% endif %}">
+        <span class="nav-icon"><i class="fas fa-bell"></i></span>
+        <span class="nav-text">Alerts</span>
+        <span class="nav-badge alert" id="alertBadge">!</span>
+      </a>
+      <a href="/settings" class="nav-item {% if active=='settings' %}active{% endif %}">
+        <span class="nav-icon"><i class="fas fa-sliders"></i></span>
+        <span class="nav-text">Settings</span>
+      </a>
+    </div>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="system-status">
+      <span class="status-dot pulse"></span>
+      <span>System Online</span>
+    </div>
+    <div class="version">v2.4.1 • ML Active</div>
+  </div>
+</aside>
+
+<!-- Main Content -->
+<div class="main-wrapper">
+  <!-- Top Header -->
+  <header class="top-header">
+    <div class="header-left">
+      <button class="menu-toggle" onclick="toggleSidebar()">
+        <i class="fas fa-bars"></i>
+      </button>
+      <div class="breadcrumb">
+        <span class="breadcrumb-root"><i class="fas fa-city"></i> Delhi NCR</span>
+        <i class="fas fa-chevron-right"></i>
+        <span class="breadcrumb-current">{% block page_title %}Dashboard{% endblock %}</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="header-weather">
+        <i class="fas fa-cloud-rain"></i>
+        <span id="headerRainfall">Loading...</span>
+      </div>
+      <div class="header-time" id="headerTime"></div>
+      <button class="theme-btn" onclick="toggleTheme()" title="Toggle Theme">
+        <i class="fas fa-moon" id="themeIcon"></i>
+      </button>
+      <div class="user-avatar">
+        <i class="fas fa-user-shield"></i>
+      </div>
+    </div>
+  </header>
+
+  <!-- Page Content -->
+  <main class="page-content">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+<!-- Scripts -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% block extra_js %}{% endblock %}
+
+<script>
+  // Global init
+  updateClock();
+  setInterval(updateClock, 1000);
+  initTheme();
+  loadAlertBadge();
+
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('headerTime').textContent = 
+      now.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  }
+
+  function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('collapsed');
+    document.querySelector('.main-wrapper').classList.toggle('expanded');
+  }
+
+  function initTheme() {
+    const theme = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+    document.getElementById('themeIcon').className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+  }
+
+  function toggleTheme() {
+    const cur = document.documentElement.getAttribute('data-theme');
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+    document.getElementById('themeIcon').className = next === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+  }
+
+  async function loadAlertBadge() {
+    try {
+      const r = await fetch('/api/alerts');
+      const d = await r.json();
+      document.getElementById('alertBadge').textContent = d.total;
+      document.getElementById('headerRainfall').textContent = 'Monsoon Active';
+    } catch(e) {}
+  }
+</script>
+</body>
+</html>

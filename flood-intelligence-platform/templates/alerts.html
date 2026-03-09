@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{% block title %}Alerts — FloodIQ Delhi{% endblock %}
+{% block page_title %}Alerts{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-info">
+    <h1>Flood Alert System</h1>
+    <p>AI-generated flood warnings and emergency advisories for Delhi wards</p>
+  </div>
+  <div class="page-header-actions">
+    <button class="btn btn-danger btn-sm" onclick="triggerEmergency()">
+      <i class="fas fa-siren"></i> Emergency Broadcast
+    </button>
+    <button class="btn btn-secondary btn-sm" onclick="loadAlerts()">
+      <i class="fas fa-sync-alt"></i> Refresh
+    </button>
+  </div>
+</div>
+
+<!-- Alert Stats -->
+<div class="stats-grid" style="margin-bottom:16px">
+  <div class="stat-card red">
+    <div class="stat-icon red"><i class="fas fa-radiation"></i></div>
+    <div class="stat-info">
+      <div class="stat-value" id="criticalCount">—</div>
+      <div class="stat-label">Critical Alerts</div>
+    </div>
+  </div>
+  <div class="stat-card orange">
+    <div class="stat-icon orange"><i class="fas fa-triangle-exclamation"></i></div>
+    <div class="stat-info">
+      <div class="stat-value" id="highCount">—</div>
+      <div class="stat-label">High Severity</div>
+    </div>
+  </div>
+  <div class="stat-card cyan">
+    <div class="stat-icon cyan"><i class="fas fa-circle-info"></i></div>
+    <div class="stat-info">
+      <div class="stat-value" id="moderateCount">—</div>
+      <div class="stat-label">Moderate Alerts</div>
+    </div>
+  </div>
+  <div class="stat-card purple">
+    <div class="stat-icon purple"><i class="fas fa-users-between-lines"></i></div>
+    <div class="stat-info">
+      <div class="stat-value" id="totalAtRisk">—</div>
+      <div class="stat-label">Total Population at Risk</div>
+    </div>
+  </div>
+</div>
+
+<!-- Emergency Banner -->
+<div id="emergencyBanner" style="display:none;background:linear-gradient(135deg,rgba(185,28,28,0.3),rgba(239,68,68,0.2));border:1px solid var(--danger);border-radius:var(--radius);padding:16px 20px;margin-bottom:16px;display:none;animation:blinkBadge 1s infinite">
+  <div style="display:flex;align-items:center;gap:12px">
+    <i class="fas fa-siren" style="color:var(--danger);font-size:20px"></i>
+    <div>
+      <div style="font-family:Syne,sans-serif;font-weight:700;color:var(--danger)">EMERGENCY BROADCAST ACTIVE</div>
+      <div style="font-size:12px;color:var(--text-secondary)">All Delhi residents are advised to follow emergency protocols immediately.</div>
+    </div>
+    <button class="btn btn-sm" style="margin-left:auto;background:rgba(239,68,68,0.2);color:var(--danger)" onclick="this.parentElement.parentElement.style.display='none'">Dismiss</button>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 300px;gap:16px">
+  <!-- Alerts List -->
+  <div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <button class="btn btn-sm btn-secondary active-filter" onclick="filterAlerts('ALL',this)">All Alerts</button>
+      <button class="btn btn-sm" style="background:rgba(239,68,68,0.1);color:var(--danger);border:1px solid rgba(239,68,68,0.2)" onclick="filterAlerts('CRITICAL',this)">Critical</button>
+      <button class="btn btn-sm" style="background:rgba(245,158,11,0.1);color:var(--warning);border:1px solid rgba(245,158,11,0.2)" onclick="filterAlerts('HIGH',this)">High</button>
+      <button class="btn btn-sm" style="background:rgba(59,130,246,0.1);color:var(--info);border:1px solid rgba(59,130,246,0.2)" onclick="filterAlerts('MODERATE',this)">Moderate</button>
+    </div>
+    <div id="alertsList">
+      <div class="loading"><div class="spinner"></div> Loading alerts...</div>
+    </div>
+  </div>
+
+  <!-- Alert Map -->
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <div class="card" style="padding:14px">
+      <div class="card-title">Alert Locations</div>
+      <div class="map-container" style="height:320px">
+        <div id="alertMap"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Response Checklist</div>
+      <div id="checklist">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer">
+            <input type="checkbox" onchange="updateChecklist(this)"/> Alert local authorities
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer">
+            <input type="checkbox" onchange="updateChecklist(this)"/> Deploy pump units
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer">
+            <input type="checkbox" onchange="updateChecklist(this)"/> Activate rescue teams
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer">
+            <input type="checkbox" onchange="updateChecklist(this)"/> Issue public advisory
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer">
+            <input type="checkbox" onchange="updateChecklist(this)"/> Open relief shelters
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer">
+            <input type="checkbox" onchange="updateChecklist(this)"/> Coordinate with NDMA
+          </label>
+        </div>
+        <div style="margin-top:12px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+            <span style="color:var(--text-muted)">Response Progress</span>
+            <span id="checkPct">0%</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill green" id="checkFill" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/alerts.js') }}"></script>
+<script>
+// alerts.js loaded above — loadAlerts(), renderAlertCards(), filterAlerts(), triggerEmergency() all available
+
+async function loadAlerts() {
+  if (!aMap) aMap = createLeafletMap('alertMap');
+  const r = await fetch('/api/alerts');
+  const d = await r.json();
+  allAlerts = d.alerts;
+  
+  const critical = allAlerts.filter(a=>a.severity==='CRITICAL').length;
+  const high = allAlerts.filter(a=>a.severity==='HIGH').length;
+  const moderate = allAlerts.filter(a=>a.severity==='MODERATE').length;
+  const totalPop = allAlerts.reduce((s,a)=>s+a.population_at_risk,0);
+  
+  document.getElementById('criticalCount').textContent = critical;
+  document.getElementById('highCount').textContent = high;
+  document.getElementById('moderateCount').textContent = moderate;
+  document.getElementById('totalAtRisk').textContent = numFormat(totalPop);
+  
+  renderAlerts(allAlerts);
+  renderAlertMap(allAlerts);
+}
+
+function renderAlerts(alerts) {
+  document.getElementById('alertsList').innerHTML = alerts.map((a,i) => {
+    const sevClass = {'CRITICAL':'critical','HIGH':'high','MODERATE':'moderate'}[a.severity];
+    const sevColor = {'CRITICAL':'var(--danger)','HIGH':'var(--warning)','MODERATE':'var(--info)'}[a.severity];
+    return `
+      <div class="alert-card ${sevClass}" style="animation-delay:${i*0.06}s">
+        <div class="alert-header">
+          <div>
+            <span class="badge ${a.severity === 'CRITICAL' ? 'badge-critical' : a.severity === 'HIGH' ? 'badge-high' : 'badge-info'}" style="margin-bottom:6px">${a.severity}</span>
+            <div class="alert-title" style="color:${sevColor}">${a.ward_name}</div>
+          </div>
+          <div style="text-align:right;font-size:12px">
+            <div style="color:var(--text-muted)">ETA</div>
+            <div style="font-family:Syne,sans-serif;font-weight:700;color:${sevColor}">${a.eta_hours}h</div>
+          </div>
+        </div>
+        <div class="alert-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+            <div style="background:var(--bg-card2);border-radius:6px;padding:8px;text-align:center">
+              <div style="font-size:10px;color:var(--text-muted)">WATER DEPTH</div>
+              <div style="font-weight:700;color:${sevColor}">${a.expected_depth}m</div>
+            </div>
+            <div style="background:var(--bg-card2);border-radius:6px;padding:8px;text-align:center">
+              <div style="font-size:10px;color:var(--text-muted)">RAINFALL</div>
+              <div style="font-weight:700">${a.rainfall}mm</div>
+            </div>
+            <div style="background:var(--bg-card2);border-radius:6px;padding:8px;text-align:center">
+              <div style="font-size:10px;color:var(--text-muted)">POP. AT RISK</div>
+              <div style="font-weight:700">${numFormat(a.population_at_risk)}</div>
+            </div>
+          </div>
+          <div class="alert-advisories">
+            ${a.advisories.map(adv => `<span class="advisory-tag"><i class="fas fa-chevron-right" style="font-size:9px"></i> ${adv}</span>`).join('')}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderAlertMap(alerts) {
+  if (alertMarkerLayer) aMap.removeLayer(alertMarkerLayer);
+  alertMarkerLayer = L.layerGroup();
+  
+  // get wards from API to match lat/lng
+  fetch('/api/wards').then(r=>r.json()).then(d => {
+    const wardMap = {};
+    d.wards.forEach(w => wardMap[w.ward_name] = w);
+    
+    alerts.forEach(a => {
+      const w = d.wards.find(w => w.ward_name === a.ward_name);
+      if (!w) return;
+      const color = {'CRITICAL':'#ef4444','HIGH':'#f59e0b','MODERATE':'#3b82f6'}[a.severity];
+      const icon = L.divIcon({
+        html: `<div style="width:16px;height:16px;border-radius:50%;background:${color};border:3px solid white;box-shadow:0 0 12px ${color};animation:pulse 1.5s infinite"></div>`,
+        className: '', iconSize: L.point(16, 16)
+      });
+      L.marker([w.latitude, w.longitude], { icon })
+        .bindPopup(`<b style="font-family:Syne,sans-serif">${a.ward_name}</b><br/><span style="color:${color}">${a.severity}</span><br/>Depth: ${a.expected_depth}m<br/>ETA: ${a.eta_hours}h`)
+        .addTo(alertMarkerLayer);
+    });
+    aMap.addLayer(alertMarkerLayer);
+  });
+}
+
+function filterAlerts(severity, btn) {
+  document.querySelectorAll('.active-filter').forEach(b => b.classList.remove('active-filter'));
+  if (btn) btn.classList.add('active-filter');
+  const filtered = severity === 'ALL' ? allAlerts : allAlerts.filter(a => a.severity === severity);
+  renderAlerts(filtered);
+}
+
+function triggerEmergency() {
+  const banner = document.getElementById('emergencyBanner');
+  banner.style.display = 'block';
+}
+
+function updateChecklist(cb) {
+  const all = document.querySelectorAll('#checklist input[type=checkbox]');
+  const checked = document.querySelectorAll('#checklist input[type=checkbox]:checked').length;
+  const pct = Math.round(checked / all.length * 100);
+  document.getElementById('checkPct').textContent = pct + '%';
+  document.getElementById('checkFill').style.width = pct + '%';
+}
+
+loadAlerts();
+</script>
+{% endblock %}

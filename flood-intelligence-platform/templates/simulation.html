@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% block title %}Digital Twin Simulation — FloodIQ Delhi{% endblock %}
+{% block page_title %}Simulation{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-info">
+    <h1>Digital Twin Flood Simulation</h1>
+    <p>Animated flood spread model across high-risk Delhi wards</p>
+  </div>
+  <div class="page-header-actions">
+    <button class="btn btn-primary btn-lg" id="startBtn" onclick="startSimulation()">
+      <i class="fas fa-play"></i> Start Simulation
+    </button>
+    <button class="btn btn-secondary btn-sm" onclick="resetSim()">
+      <i class="fas fa-redo"></i> Reset
+    </button>
+  </div>
+</div>
+
+<!-- Sim Steps -->
+<div class="sim-steps" style="margin-bottom:16px">
+  <div class="sim-step" id="step0" onclick="jumpToStep(0)">
+    <div style="font-weight:700;font-size:13px">0 min</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Rainfall Begins</div>
+  </div>
+  <div class="sim-step" id="step1" onclick="jumpToStep(1)">
+    <div style="font-weight:700;font-size:13px">30 min</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Water Accumulation</div>
+  </div>
+  <div class="sim-step" id="step2" onclick="jumpToStep(2)">
+    <div style="font-weight:700;font-size:13px">60 min</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Drains Overloaded</div>
+  </div>
+  <div class="sim-step" id="step3" onclick="jumpToStep(3)">
+    <div style="font-weight:700;font-size:13px">90 min</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Flood Spread</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 320px;gap:16px">
+  <!-- Map -->
+  <div class="card" style="padding:14px">
+    <div class="card-title">
+      Flood Spread Animation
+      <div style="display:flex;align-items:center;gap:12px">
+        <span id="simTimeLabel" style="font-size:13px;font-weight:600;color:var(--primary-light)">Ready</span>
+        <div id="simProgressBar" style="width:120px">
+          <div class="progress-bar"><div class="progress-fill purple" id="simFill" style="width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="map-container" style="height:480px">
+      <div id="simMap"></div>
+    </div>
+    <div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap">
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(99,102,241,0.6)"></div> T=0 Initial</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(245,158,11,0.6)"></div> T=30 Accumulation</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(239,68,68,0.6)"></div> T=60 Overload</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(185,28,28,0.8)"></div> T=90 Flood</div>
+    </div>
+  </div>
+
+  <!-- Side Timeline & Stats -->
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <div class="card">
+      <div class="card-title">Simulation Status</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="background:var(--bg-card2);border-radius:var(--radius-sm);padding:12px">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">CURRENT TIME</div>
+          <div style="font-family:Syne,sans-serif;font-size:28px;font-weight:800;color:var(--primary-light)" id="currentTime">00:00</div>
+        </div>
+        <div class="info-row"><span class="info-row-label">Wards Affected</span><span class="info-row-val" id="affectedWards">0</span></div>
+        <div class="info-row"><span class="info-row-label">Max Water Depth</span><span class="info-row-val" id="maxDepth">0.0m</span></div>
+        <div class="info-row"><span class="info-row-label">Flood Radius</span><span class="info-row-val" id="floodRadius">0m</span></div>
+        <div class="info-row"><span class="info-row-label">Population at Risk</span><span class="info-row-val" id="popAtRisk">—</span></div>
+        <div class="info-row"><span class="info-row-label">Alert Level</span><span class="info-row-val" id="alertLevel">—</span></div>
+      </div>
+    </div>
+
+    <!-- Action Timeline -->
+    <div class="card">
+      <div class="card-title">AI Action Timeline</div>
+      <div class="timeline" id="actionTimeline">
+        <div class="timeline-item">
+          <div class="timeline-dot" style="background:rgba(99,102,241,0.2);color:var(--primary-light)"><i class="fas fa-cloud-rain"></i></div>
+          <div class="timeline-content">
+            <div class="timeline-time">T = 0 min</div>
+            <div class="timeline-title">Rainfall Detected</div>
+            <div class="timeline-desc">Monsoon rainfall begins. ML models activated.</div>
+          </div>
+        </div>
+        <div class="timeline-item" id="tl1" style="opacity:0.3">
+          <div class="timeline-dot" style="background:rgba(245,158,11,0.2);color:var(--warning)"><i class="fas fa-water"></i></div>
+          <div class="timeline-content">
+            <div class="timeline-time">T = 30 min</div>
+            <div class="timeline-title">Water Accumulation</div>
+            <div class="timeline-desc">Low-lying areas begin collecting surface water.</div>
+          </div>
+        </div>
+        <div class="timeline-item" id="tl2" style="opacity:0.3">
+          <div class="timeline-dot" style="background:rgba(239,68,68,0.2);color:var(--danger)"><i class="fas fa-exclamation-triangle"></i></div>
+          <div class="timeline-content">
+            <div class="timeline-time">T = 60 min</div>
+            <div class="timeline-title">Drain System Overloaded</div>
+            <div class="timeline-desc">Drain capacity exceeded. Backflow detected.</div>
+          </div>
+        </div>
+        <div class="timeline-item" id="tl3" style="opacity:0.3">
+          <div class="timeline-dot" style="background:rgba(185,28,28,0.2);color:#ff4444"><i class="fas fa-house-flood-water"></i></div>
+          <div class="timeline-content">
+            <div class="timeline-time">T = 90 min</div>
+            <div class="timeline-title">Flood Spread Active</div>
+            <div class="timeline-desc">Residential areas flooded. Rescue deployed.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/simulation.js') }}"></script>
+<script>
+// simulation.js loaded above — all logic handled externally
+let _unused = null;
+
+async function initSim() {
+  sMap = createLeafletMap('simMap');
+  const r = await fetch('/api/simulation');
+  simData = await r.json();
+}
+
+async function startSimulation() {
+  if (simRunning) return;
+  simRunning = true;
+  document.getElementById('startBtn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
+  document.getElementById('startBtn').disabled = true;
+  
+  for (let i = 0; i < 4; i++) {
+    await runStep(i);
+    await sleep(2000);
+  }
+  
+  simRunning = false;
+  document.getElementById('startBtn').innerHTML = '<i class="fas fa-play"></i> Start Simulation';
+  document.getElementById('startBtn').disabled = false;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function runStep(stepIdx) {
+  if (!simData) return;
+  currentStep = stepIdx;
+  const step = simData.steps[stepIdx];
+  const t = step.time_min;
+  const colors = ['rgba(99,102,241,0.35)', 'rgba(245,158,11,0.35)', 'rgba(239,68,68,0.4)', 'rgba(185,28,28,0.5)'];
+  const strokeColors = ['#6366f1','#f59e0b','#ef4444','#b91c1c'];
+  
+  // Update UI
+  document.getElementById('currentTime').textContent = `${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`;
+  document.getElementById('simFill').style.width = ((stepIdx+1)/4*100) + '%';
+  document.getElementById('simTimeLabel').textContent = `T = ${t} min`;
+  document.getElementById('affectedWards').textContent = step.points.length;
+  document.getElementById('maxDepth').textContent = Math.max(...step.points.map(p=>p.water_depth)).toFixed(1) + 'm';
+  document.getElementById('floodRadius').textContent = step.points[0]?.radius + 'm';
+  
+  const alertLevels = ['MONITORING','WATCH','WARNING','EMERGENCY'];
+  document.getElementById('alertLevel').innerHTML = riskBadge(['LOW','MEDIUM','HIGH','HIGH'][stepIdx]);
+  
+  // Timeline activation
+  if (stepIdx >= 1) { document.getElementById('tl1').style.opacity = 1; }
+  if (stepIdx >= 2) { document.getElementById('tl2').style.opacity = 1; }
+  if (stepIdx >= 3) { document.getElementById('tl3').style.opacity = 1; }
+  
+  // Sim step buttons
+  for (let i = 0; i < 4; i++) {
+    const el = document.getElementById('step'+i);
+    el.classList.remove('active','done');
+    if (i === stepIdx) el.classList.add('active');
+    else if (i < stepIdx) el.classList.add('done');
+  }
+  
+  // Add circles to map
+  const layer = L.layerGroup();
+  step.points.forEach(p => {
+    const circle = L.circle([p.lat, p.lng], {
+      radius: p.radius,
+      fillColor: colors[stepIdx],
+      color: strokeColors[stepIdx],
+      weight: 1.5,
+      fillOpacity: 0.5,
+      opacity: 0.8,
+    });
+    circle.bindPopup(`
+      <div style="min-width:160px">
+        <b style="font-family:Syne,sans-serif">${p.ward_name}</b>
+        <hr style="border-color:rgba(255,255,255,0.1);margin:6px 0"/>
+        <div style="font-size:12px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+            <span style="color:#94a3b8">Water Depth</span><span style="color:#ef4444;font-weight:700">${p.water_depth}m</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+            <span style="color:#94a3b8">Flood Radius</span><span>${p.radius}m</span>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="color:#94a3b8">Intensity</span><span>${(p.intensity*100).toFixed(0)}%</span>
+          </div>
+        </div>
+      </div>
+    `);
+    layer.addLayer(circle);
+  });
+  sMap.addLayer(layer);
+  simLayers.push(layer);
+
+  // Update population estimate
+  const popEst = step.points.length * Math.round(15000 + stepIdx * 8000);
+  document.getElementById('popAtRisk').textContent = numFormat(popEst);
+}
+
+function jumpToStep(i) {
+  if (!simData) { alert('Load simulation data first — click Start Simulation'); return; }
+  resetSim(false);
+  for (let j = 0; j <= i; j++) runStep(j);
+}
+
+function resetSim(clearData=true) {
+  simLayers.forEach(l => sMap.removeLayer(l));
+  simLayers = [];
+  currentStep = -1;
+  document.getElementById('currentTime').textContent = '00:00';
+  document.getElementById('simFill').style.width = '0%';
+  document.getElementById('simTimeLabel').textContent = 'Ready';
+  document.getElementById('affectedWards').textContent = '0';
+  document.getElementById('maxDepth').textContent = '0.0m';
+  document.getElementById('floodRadius').textContent = '0m';
+  document.getElementById('popAtRisk').textContent = '—';
+  document.getElementById('alertLevel').textContent = '—';
+  ['tl1','tl2','tl3'].forEach(id => document.getElementById(id).style.opacity = 0.3);
+  for (let i = 0; i < 4; i++) {
+    const el = document.getElementById('step'+i);
+    el.classList.remove('active','done');
+  }
+}
+
+initSim();
+</script>
+{% endblock %}

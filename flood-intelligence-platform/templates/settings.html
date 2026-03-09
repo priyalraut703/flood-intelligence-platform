@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+{% block title %}Settings — FloodIQ Delhi{% endblock %}
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-info">
+    <h1>System Settings</h1>
+    <p>Configure platform preferences, notifications, and display options</p>
+  </div>
+  <div class="page-header-actions">
+    <button class="btn btn-primary btn-sm" onclick="saveSettings()">
+      <i class="fas fa-save"></i> Save Settings
+    </button>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+  <!-- Appearance -->
+  <div class="card">
+    <div class="settings-title"><i class="fas fa-palette"></i> Appearance</div>
+    
+    <div class="settings-section">
+      <label class="form-label">Theme</label>
+      <div class="theme-options">
+        <div class="theme-option" id="themeLight" onclick="applyTheme('light',this)">
+          <div class="theme-preview" style="background:linear-gradient(135deg,#f0f2f8,#e8ebf5);border:1px solid rgba(0,0,0,0.1)"></div>
+          <span>Light</span>
+        </div>
+        <div class="theme-option active" id="themeDark" onclick="applyTheme('dark',this)">
+          <div class="theme-preview" style="background:linear-gradient(135deg,#0d0f1a,#131626)"></div>
+          <span>Dark</span>
+        </div>
+        <div class="theme-option" id="themeSystem" onclick="applyTheme('system',this)">
+          <div class="theme-preview" style="background:linear-gradient(135deg,#0d0f1a 50%,#f0f2f8 50%)"></div>
+          <span>System</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-row">
+      <div class="settings-row-info">
+        <label>Compact Sidebar</label>
+        <span>Collapse sidebar to icon-only view</span>
+      </div>
+      <div class="toggle-switch" id="toggleCompact" onclick="toggleSetting('compact',this)"></div>
+    </div>
+    <div class="settings-row">
+      <div class="settings-row-info">
+        <label>Animations</label>
+        <span>Enable UI animations and transitions</span>
+      </div>
+      <div class="toggle-switch on" id="toggleAnim" onclick="toggleSetting('anim',this)"></div>
+    </div>
+    
+    <div class="settings-section" style="margin-top:16px">
+      <label class="form-label">Map Style</label>
+      <select class="form-select" id="mapStyle" onchange="saveMapStyle(this.value)">
+        <option value="dark">Dark (CartoDB Dark)</option>
+        <option value="light">Light (CartoDB Light)</option>
+        <option value="satellite">Satellite (Esri)</option>
+        <option value="streets">Streets (OpenStreetMap)</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Notifications -->
+  <div class="card">
+    <div class="settings-title"><i class="fas fa-bell"></i> Notifications</div>
+    <div class="settings-row">
+      <div class="settings-row-info">
+        <label>Flood Alerts</label>
+        <span>Receive high-priority flood warnings</span>
+      </div>
+      <div class="toggle-switch on" onclick="toggleSetting('alerts',this)"></div>
+    </div>
+    <div class="settings-row">
+      <div class="settings-row-info">
+        <label>Rainfall Updates</label>
+        <span>Hourly rainfall change notifications</span>
+      </div>
+      <div class="toggle-switch on" onclick="toggleSetting('rainfall',this)"></div>
+    </div>
+    <div class="settings-row">
+      <div class="settings-row-info">
+        <label>Model Predictions</label>
+        <span>ML model result updates</span>
+      </div>
+      <div class="toggle-switch on" onclick="toggleSetting('model',this)"></div>
+    </div>
+    <div class="settings-row">
+      <div class="settings-row-info">
+        <label>Resource Alerts</label>
+        <span>Emergency resource deployment notifications</span>
+      </div>
+      <div class="toggle-switch" onclick="toggleSetting('resource',this)"></div>
+    </div>
+    <div class="settings-row">
+      <div class="settings-row-info">
+        <label>Email Reports</label>
+        <span>Daily summary reports via email</span>
+      </div>
+      <div class="toggle-switch" onclick="toggleSetting('email',this)"></div>
+    </div>
+  </div>
+
+  <!-- ML Model Settings -->
+  <div class="card">
+    <div class="settings-title"><i class="fas fa-brain"></i> ML Model Configuration</div>
+    <div class="form-group">
+      <label class="form-label">Model Algorithm</label>
+      <select class="form-select">
+        <option selected>Random Forest Classifier</option>
+        <option>Gradient Boosting</option>
+        <option>XGBoost</option>
+        <option>Neural Network (MLP)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">High Risk Threshold</label>
+      <input type="range" min="40" max="80" value="55" oninput="document.getElementById('thrVal').textContent=this.value+'%'"/>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted)">
+        <span>40%</span><span id="thrVal">55%</span><span>80%</span>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Prediction Update Interval</label>
+      <select class="form-select">
+        <option>Every 15 minutes</option>
+        <option selected>Every 30 minutes</option>
+        <option>Every hour</option>
+        <option>Every 6 hours</option>
+      </select>
+    </div>
+    <div class="settings-row">
+      <div class="settings-row-info">
+        <label>Auto-Retrain Model</label>
+        <span>Retrain with new rainfall data</span>
+      </div>
+      <div class="toggle-switch on" onclick="toggleSetting('retrain',this)"></div>
+    </div>
+    <div style="margin-top:12px">
+      <button class="btn btn-primary btn-sm" onclick="retrainModel()">
+        <i class="fas fa-rotate"></i> Retrain Now
+      </button>
+      <span style="font-size:11px;color:var(--text-muted);margin-left:10px">Last trained: Today 08:30 AM</span>
+    </div>
+  </div>
+
+  <!-- Data Settings -->
+  <div class="card">
+    <div class="settings-title"><i class="fas fa-database"></i> Data & Integration</div>
+    <div class="form-group">
+      <label class="form-label">City</label>
+      <input type="text" class="form-input" value="Delhi, India" readonly/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Total Wards</label>
+      <input type="number" class="form-input" value="120"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Hotspot Density</label>
+      <select class="form-select">
+        <option>Low (500 hotspots)</option>
+        <option selected>Medium (2560 hotspots)</option>
+        <option>High (5000 hotspots)</option>
+      </select>
+    </div>
+    <div class="settings-row">
+      <div class="settings-row-info">
+        <label>Live API Integration</label>
+        <span>Connect to IMD weather API</span>
+      </div>
+      <div class="toggle-switch" onclick="toggleSetting('api',this)"></div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-secondary btn-sm" onclick="regenerateData()">
+        <i class="fas fa-database"></i> Regenerate Data
+      </button>
+      <button class="btn btn-secondary btn-sm" onclick="exportAll()">
+        <i class="fas fa-download"></i> Export All
+      </button>
+    </div>
+  </div>
+
+  <!-- About -->
+  <div class="card" style="grid-column:span 2">
+    <div class="settings-title"><i class="fas fa-info-circle"></i> About FloodIQ</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+      <div class="info-row" style="flex-direction:column;align-items:flex-start">
+        <span class="info-row-label">Platform</span>
+        <span class="info-row-val">FloodIQ Delhi v2.4.1</span>
+      </div>
+      <div class="info-row" style="flex-direction:column;align-items:flex-start">
+        <span class="info-row-label">Backend</span>
+        <span class="info-row-val">Python / Flask</span>
+      </div>
+      <div class="info-row" style="flex-direction:column;align-items:flex-start">
+        <span class="info-row-label">ML Framework</span>
+        <span class="info-row-val">Scikit-learn</span>
+      </div>
+      <div class="info-row" style="flex-direction:column;align-items:flex-start">
+        <span class="info-row-label">Maps</span>
+        <span class="info-row-val">Leaflet.js + CartoDB</span>
+      </div>
+    </div>
+    <div style="margin-top:16px;padding:12px;background:var(--bg-card2);border-radius:var(--radius-sm);font-size:12px;color:var(--text-muted)">
+      <i class="fas fa-shield-halved" style="color:var(--primary-light)"></i>
+      FloodIQ is a hackathon prototype demonstrating AI-powered urban flood intelligence for Delhi's disaster management teams.
+      Built with Random Forest ML model trained on 500 synthetic samples, monitoring 120 wards and 2,560 flood hotspots.
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" style="position:fixed;bottom:24px;right:24px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 20px;font-size:13px;box-shadow:var(--shadow);transform:translateY(80px);opacity:0;transition:all 0.3s;z-index:9999">
+  <i class="fas fa-check-circle" style="color:var(--success)"></i>
+  <span id="toastMsg"></span>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+<script>
+// settings.js loaded above
+function applyTheme(theme, el) {
+  document.querySelectorAll('.theme-option').forEach(o => o.classList.remove('active'));
+  if (el) el.classList.add('active');
+  const actual = theme === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme;
+  document.documentElement.setAttribute('data-theme', actual);
+  localStorage.setItem('theme', actual);
+  document.getElementById('themeIcon').className = actual === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+}
+
+function toggleSetting(key, el) {
+  el.classList.toggle('on');
+}
+
+function saveSettings() {
+  toast('Settings saved successfully!');
+}
+
+function retrainModel() {
+  toast('Model retraining scheduled...');
+}
+
+function regenerateData() {
+  toast('Data regeneration started. Refresh in 5s...');
+}
+
+function exportAll() {
+  toast('Exporting all platform data...');
+}
+
+function saveMapStyle(style) {
+  localStorage.setItem('mapStyle', style);
+  toast('Map style updated: ' + style);
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = ' ' + msg;
+  t.style.transform = 'translateY(0)';
+  t.style.opacity = '1';
+  setTimeout(() => {
+    t.style.transform = 'translateY(80px)';
+    t.style.opacity = '0';
+  }, 3000);
+}
+
+// Init theme display
+const cur = localStorage.getItem('theme') || 'dark';
+document.querySelectorAll('.theme-option').forEach(o => o.classList.remove('active'));
+const el = document.getElementById(cur === 'dark' ? 'themeDark' : cur === 'light' ? 'themeLight' : 'themeSystem');
+if (el) el.classList.add('active');
+</script>
+{% endblock %}

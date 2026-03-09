@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block title %}Resources — FloodIQ Delhi{% endblock %}
+{% block page_title %}Resources{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-info">
+    <h1>Emergency Resource Allocation</h1>
+    <p>AI-powered resource deployment across Delhi wards based on flood risk</p>
+  </div>
+  <div class="page-header-actions">
+    <button class="btn btn-primary btn-sm" onclick="loadResources()">
+      <i class="fas fa-sync-alt"></i> Re-Allocate
+    </button>
+    <button class="btn btn-secondary btn-sm" onclick="exportResources()">
+      <i class="fas fa-download"></i> Export Plan
+    </button>
+  </div>
+</div>
+
+<!-- Resource Summary -->
+<div class="stats-grid" style="margin-bottom:16px">
+  <div class="stat-card purple">
+    <div class="stat-icon purple"><i class="fas fa-pump-soap"></i></div>
+    <div class="stat-info">
+      <div class="stat-value" id="totalPumps">—</div>
+      <div class="stat-label">Total Pumps Deployed</div>
+    </div>
+  </div>
+  <div class="stat-card red">
+    <div class="stat-icon red"><i class="fas fa-people-group"></i></div>
+    <div class="stat-info">
+      <div class="stat-value" id="totalTeams">—</div>
+      <div class="stat-label">Emergency Teams</div>
+    </div>
+  </div>
+  <div class="stat-card cyan">
+    <div class="stat-icon cyan"><i class="fas fa-sailboat"></i></div>
+    <div class="stat-info">
+      <div class="stat-value" id="totalBoats">—</div>
+      <div class="stat-label">Rescue Boats</div>
+    </div>
+  </div>
+  <div class="stat-card orange">
+    <div class="stat-icon orange"><i class="fas fa-shield-halved"></i></div>
+    <div class="stat-info">
+      <div class="stat-value" id="totalWards">—</div>
+      <div class="stat-label">Wards with Resources</div>
+    </div>
+  </div>
+</div>
+
+<!-- Allocation Logic Info -->
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+  <div class="card" style="border-left:4px solid var(--danger)">
+    <div style="font-family:Syne,sans-serif;font-weight:700;margin-bottom:10px;color:var(--danger)">
+      <i class="fas fa-triangle-exclamation"></i> HIGH RISK WARD
+    </div>
+    <div class="info-row"><span class="info-row-label">Water Pumps</span><span class="info-row-val">3 units</span></div>
+    <div class="info-row"><span class="info-row-label">Emergency Teams</span><span class="info-row-val">2 teams</span></div>
+    <div class="info-row"><span class="info-row-label">Rescue Boats</span><span class="info-row-val">1 boat</span></div>
+  </div>
+  <div class="card" style="border-left:4px solid var(--warning)">
+    <div style="font-family:Syne,sans-serif;font-weight:700;margin-bottom:10px;color:var(--warning)">
+      <i class="fas fa-circle-exclamation"></i> MEDIUM RISK WARD
+    </div>
+    <div class="info-row"><span class="info-row-label">Water Pumps</span><span class="info-row-val">2 units</span></div>
+    <div class="info-row"><span class="info-row-label">Emergency Teams</span><span class="info-row-val">1 team</span></div>
+    <div class="info-row"><span class="info-row-label">Rescue Boats</span><span class="info-row-val">None</span></div>
+  </div>
+  <div class="card" style="border-left:4px solid var(--success)">
+    <div style="font-family:Syne,sans-serif;font-weight:700;margin-bottom:10px;color:var(--success)">
+      <i class="fas fa-circle-check"></i> LOW RISK WARD
+    </div>
+    <div class="info-row"><span class="info-row-label">Water Pumps</span><span class="info-row-val">—</span></div>
+    <div class="info-row"><span class="info-row-label">Emergency Teams</span><span class="info-row-val">—</span></div>
+    <div class="info-row"><span class="info-row-label">Action</span><span class="info-row-val" style="color:var(--success)">Monitoring</span></div>
+  </div>
+</div>
+
+<!-- Resource Table -->
+<div class="card">
+  <div class="card-title">
+    Resource Deployment Table
+    <div style="display:flex;gap:8px">
+      <input type="text" class="form-input" id="searchBox" placeholder="Search ward..." style="width:180px;padding:5px 10px;font-size:12px" oninput="filterTable(this.value)"/>
+      <select class="form-select" id="riskFilter" style="width:120px;padding:5px 10px;font-size:12px" onchange="filterByRisk(this.value)">
+        <option value="ALL">All Risks</option>
+        <option value="HIGH">High</option>
+        <option value="MEDIUM">Medium</option>
+      </select>
+    </div>
+  </div>
+  <div class="table-wrapper" id="resourceTable">
+    <div class="loading"><div class="spinner"></div> Loading allocations...</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/resources.js') }}"></script>
+<script>
+// resources.js loaded above — allResources, renderResourceTable, filterTable, filterByRisk, exportResources all available
+
+async function loadResources() {
+  const r = await fetch('/api/resources');
+  const d = await r.json();
+  allResources = d.resources;
+  
+  const totalPumps = allResources.reduce((a,b)=>a+b.pumps,0);
+  const totalTeams = allResources.reduce((a,b)=>a+b.teams,0);
+  const totalBoats = allResources.reduce((a,b)=>a+b.boats,0);
+  
+  document.getElementById('totalPumps').textContent = totalPumps;
+  document.getElementById('totalTeams').textContent = totalTeams;
+  document.getElementById('totalBoats').textContent = totalBoats;
+  document.getElementById('totalWards').textContent = allResources.length;
+  
+  renderTable(allResources);
+}
+
+function renderTable(resources) {
+  if (resources.length === 0) {
+    document.getElementById('resourceTable').innerHTML = '<div class="loading">No resources found</div>';
+    return;
+  }
+  document.getElementById('resourceTable').innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Ward ID</th>
+          <th>Ward Name</th>
+          <th>Risk Level</th>
+          <th>Population</th>
+          <th>Pumps</th>
+          <th>Teams</th>
+          <th>Boats</th>
+          <th>Readiness</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${resources.map(r => `
+          <tr>
+            <td style="font-size:11px;color:var(--text-muted)">${r.ward_id}</td>
+            <td style="font-weight:600">${r.ward_name}</td>
+            <td>${riskBadge(r.risk_level)}</td>
+            <td>${numFormat(r.population)}</td>
+            <td>
+              <div style="display:flex;gap:4px;align-items:center">
+                ${Array.from({length:r.pumps}, () => '<i class="fas fa-pump-soap" style="color:var(--primary-light);font-size:12px"></i>').join('')}
+                <span style="margin-left:4px;font-size:12px">${r.pumps}</span>
+              </div>
+            </td>
+            <td>
+              <div style="display:flex;gap:4px;align-items:center">
+                ${Array.from({length:r.teams}, () => '<i class="fas fa-person-military-pointing" style="color:var(--accent2);font-size:12px"></i>').join('')}
+                <span style="margin-left:4px;font-size:12px">${r.teams}</span>
+              </div>
+            </td>
+            <td>
+              ${r.boats > 0 ? '<span style="color:var(--info);font-size:12px"><i class="fas fa-sailboat"></i> ' + r.boats + '</span>' : '<span style="color:var(--text-muted);font-size:11px">—</span>'}
+            </td>
+            <td>
+              <div style="display:flex;align-items:center;gap:6px;min-width:80px">
+                <div class="progress-bar" style="flex:1">
+                  <div class="progress-fill ${r.readiness_score > 0.7 ? 'green' : r.readiness_score > 0.5 ? 'orange' : 'red'}"
+                       style="width:${r.readiness_score*100}%"></div>
+                </div>
+                <span style="font-size:11px">${(r.readiness_score*100).toFixed(0)}%</span>
+              </div>
+            </td>
+            <td>
+              <span class="badge ${r.risk_level === 'HIGH' ? 'badge-high' : 'badge-medium'}">
+                ${r.risk_level === 'HIGH' ? 'DEPLOYED' : 'STANDBY'}
+              </span>
+            </td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function filterTable(query) {
+  const risk = document.getElementById('riskFilter').value;
+  let filtered = allResources;
+  if (risk !== 'ALL') filtered = filtered.filter(r => r.risk_level === risk);
+  if (query) filtered = filtered.filter(r => r.ward_name.toLowerCase().includes(query.toLowerCase()));
+  renderTable(filtered);
+}
+
+function filterByRisk(risk) {
+  const query = document.getElementById('searchBox').value;
+  filterTable(query);
+}
+
+function exportResources() {
+  const rows = [['Ward ID','Ward Name','Risk Level','Population','Pumps','Teams','Boats','Readiness']];
+  allResources.forEach(r => rows.push([r.ward_id,r.ward_name,r.risk_level,r.population,r.pumps,r.teams,r.boats,(r.readiness_score*100).toFixed(0)+'%']));
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv,' + encodeURIComponent(csv);
+  a.download = 'resource_allocation.csv';
+  a.click();
+}
+
+loadResources();
+</script>
+{% endblock %}

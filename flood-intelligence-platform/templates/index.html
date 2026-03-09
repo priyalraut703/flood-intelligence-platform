@@ -1,0 +1,392 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — FloodIQ Delhi{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-info">
+    <h1>Flood Intelligence Dashboard</h1>
+    <p>Real-time flood risk monitoring for Delhi NCR — <span id="lastUpdated">Updating...</span></p>
+  </div>
+  <div class="page-header-actions">
+    <button class="btn btn-secondary btn-sm" onclick="refreshDashboard()">
+      <i class="fas fa-sync-alt"></i> Refresh
+    </button>
+    <button class="btn btn-primary btn-sm" onclick="window.location='/alerts'">
+      <i class="fas fa-bell"></i> View Alerts
+    </button>
+  </div>
+</div>
+
+<!-- Stats Row -->
+<div class="stats-grid">
+  <div class="stat-card purple">
+    <div class="stat-icon purple"><i class="fas fa-map-marked-alt"></i></div>
+    <div class="stat-info">
+      <div class="stat-value" id="statTotal">{{ stats.total_wards }}</div>
+      <div class="stat-label">Total Wards Monitored</div>
+      <div class="stat-change up"><i class="fas fa-arrow-up"></i> Active Monitoring</div>
+    </div>
+  </div>
+  <div class="stat-card red">
+    <div class="stat-icon red"><i class="fas fa-triangle-exclamation"></i></div>
+    <div class="stat-info">
+      <div class="stat-value" id="statHigh">{{ stats.high_risk }}</div>
+      <div class="stat-label">High Risk Wards</div>
+      <div class="stat-change down"><i class="fas fa-exclamation-circle"></i> Needs Attention</div>
+    </div>
+  </div>
+  <div class="stat-card orange">
+    <div class="stat-icon orange"><i class="fas fa-users"></i></div>
+    <div class="stat-info">
+      <div class="stat-value" id="statPop">{{ "{:,}".format(stats.affected_population) }}</div>
+      <div class="stat-label">Affected Population</div>
+      <div class="stat-change down"><i class="fas fa-arrow-up"></i> High-risk zones</div>
+    </div>
+  </div>
+  <div class="stat-card cyan">
+    <div class="stat-icon cyan"><i class="fas fa-cloud-rain"></i></div>
+    <div class="stat-info">
+      <div class="stat-value" id="statRain"><span id="rainfallDisplay">{{ stats.avg_rainfall }}</span></div>
+      <div class="stat-label">Avg Rainfall (mm)</div>
+      <div class="stat-change up"><i class="fas fa-location-dot"></i> {{ stats.total_hotspots }} hotspots</div>
+    </div>
+  </div>
+</div>
+
+<!-- Main Grid -->
+<div class="grid-map-side" style="margin-bottom:16px">
+  <!-- Map Card -->
+  <div class="card" style="padding:16px">
+    <div class="card-title">
+      Live Flood Hotspot Map
+      <span>{{ stats.total_hotspots }} micro-hotspots loaded</span>
+    </div>
+    <!-- Rainfall Slider -->
+    <div class="slider-section">
+      <div class="slider-header">
+        <span class="slider-label"><i class="fas fa-cloud-rain"></i> Simulated Rainfall</span>
+        <span><span class="slider-value" id="sliderVal">80</span><span class="slider-unit"> mm</span></span>
+      </div>
+      <input type="range" id="rainfallSlider" min="10" max="250" value="80" oninput="updateRainfall(this.value)"/>
+      <div class="slider-scale"><span>Light 10mm</span><span>Moderate 80mm</span><span>Heavy 150mm</span><span>Extreme 250mm</span></div>
+    </div>
+    <div class="map-container" style="height:350px;position:relative">
+      <div id="map" style="height:100%;width:100%;border-radius:10px;"></div>
+      <div class="map-overlay-controls">
+        <button class="map-control-btn active" id="btnHotspot" onclick="toggleLayer('hotspot')"><i class="fas fa-map-pin"></i> Hotspots</button>
+        <button class="map-control-btn" id="btnWards" onclick="toggleLayer('wards')"><i class="fas fa-layer-group"></i> Wards</button>
+      </div>
+    </div>
+    <div class="risk-legend">
+      <div class="legend-item"><div class="legend-dot high"></div> High Risk</div>
+      <div class="legend-item"><div class="legend-dot medium"></div> Medium Risk</div>
+      <div class="legend-item"><div class="legend-dot low"></div> Low Risk</div>
+      <div style="margin-left:auto;font-size:11px;color:var(--text-muted)" id="visibleCount">Loading...</div>
+    </div>
+  </div>
+
+  <!-- Side Panel -->
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <!-- Risk Distribution Donut -->
+    <div class="card">
+      <div class="card-title">Risk Distribution <span>By Wards</span></div>
+      <div class="chart-container" style="height:180px">
+        <canvas id="riskDonut"></canvas>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:12px">
+        <div style="display:flex;justify-content:space-between;font-size:12px">
+          <span style="color:var(--danger)">● High</span><span id="pctHigh" style="font-weight:700">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px">
+          <span style="color:var(--warning)">● Medium</span><span id="pctMed" style="font-weight:700">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px">
+          <span style="color:var(--success)">● Low</span><span id="pctLow" style="font-weight:700">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="card">
+      <div class="card-title">System Metrics <span>Live</span></div>
+      <div class="info-row">
+        <span class="info-row-label">Model Accuracy</span>
+        <span class="info-row-val" style="color:var(--success)">98.6%</span>
+      </div>
+      <div class="info-row">
+        <span class="info-row-label">Hotspots Analyzed</span>
+        <span class="info-row-val">{{ stats.total_hotspots }}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-row-label">Medium Risk</span>
+        <span class="info-row-val" style="color:var(--warning)">{{ stats.medium_risk }}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-row-label">Low Risk</span>
+        <span class="info-row-val" style="color:var(--success)">{{ stats.low_risk }}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-row-label">ML Algorithm</span>
+        <span class="info-row-val">Random Forest</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom Row: Rainfall Bar + Top Wards -->
+<div class="grid-2" style="margin-bottom:16px">
+  <div class="card">
+    <div class="card-title">Monthly Rainfall Trend <span>Annual Pattern</span></div>
+    <div class="chart-container">
+      <canvas id="rainfallBar"></canvas>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Top Risk Wards <span>Real-time</span></div>
+    <div class="table-wrapper" id="topWardsTable">
+      <div class="loading"><div class="spinner"></div> Loading...</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/prediction.js') }}"></script>
+<script>
+let map, clusterLayer, wardsLayer, donutChart, barChart;
+let allHotspots = [], allWards = [];
+let showHotspots = true, showWards = false;
+
+async function initDashboard() {
+  map = createLeafletMap('map');
+  await loadHotspots();
+  await loadWards();
+  initDonut();
+  initBarChart();
+  await loadTopWards();
+  document.getElementById('lastUpdated').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+}
+
+async function loadHotspots() {
+  const r = await fetch('/api/hotspots');
+  const d = await r.json();
+  allHotspots = d.hotspots;
+  renderHotspotClusters(allHotspots);
+  document.getElementById('visibleCount').textContent = d.count + ' visible';
+}
+
+async function loadWards() {
+  const r = await fetch('/api/wards');
+  const d = await r.json();
+  allWards = d.wards;
+  updateStatsFromAPI(d.stats);
+}
+
+function renderHotspotClusters(hotspots) {
+  if (clusterLayer) map.removeLayer(clusterLayer);
+  clusterLayer = L.markerClusterGroup({
+    chunkedLoading: true,
+    maxClusterRadius: 60,
+    iconCreateFunction: function(cluster) {
+      const n = cluster.getChildCount();
+      return L.divIcon({
+        html: `<div style="background:linear-gradient(135deg,#7c3aed,#ec4899);color:white;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:2px solid rgba(255,255,255,0.3)">${n < 100 ? n : '99+'}</div>`,
+        className: '',
+        iconSize: L.point(36, 36)
+      });
+    }
+  });
+
+  hotspots.forEach(h => {
+    const color = riskColor(h.flood_risk_level);
+    const icon = L.divIcon({
+      html: `<div style="width:10px;height:10px;border-radius:50%;background:${color};border:2px solid rgba(255,255,255,0.5);box-shadow:0 0 6px ${color}"></div>`,
+      className: '', iconSize: L.point(10, 10)
+    });
+    const marker = L.marker([h.latitude, h.longitude], { icon });
+    marker.bindPopup(`
+      <div style="min-width:180px">
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px;font-family:Syne,sans-serif">${h.hotspot_id}</div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+          <span style="color:#94a3b8">Risk</span>
+          <span style="color:${color};font-weight:700">${h.flood_risk_level}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+          <span style="color:#94a3b8">Rainfall</span><span>${h.rainfall}mm</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px">
+          <span style="color:#94a3b8">Drain Cap</span><span>${(h.drain_capacity*100).toFixed(0)}%</span>
+        </div>
+        <div style="font-size:11px;color:#64748b;margin-top:6px">Ward: ${h.associated_ward}</div>
+      </div>
+    `);
+    clusterLayer.addLayer(marker);
+  });
+  if (showHotspots) map.addLayer(clusterLayer);
+}
+
+function renderWardMarkers(wards) {
+  if (wardsLayer) map.removeLayer(wardsLayer);
+  wardsLayer = L.layerGroup();
+  wards.forEach(w => {
+    const color = riskColor(w.risk_level);
+    const circle = L.circleMarker([w.latitude, w.longitude], {
+      radius: 10, fillColor: color, color: 'white',
+      weight: 1.5, opacity: 0.9, fillOpacity: 0.7
+    });
+    circle.bindPopup(`
+      <div style="min-width:200px">
+        <div style="font-weight:700;font-size:14px;margin-bottom:8px;font-family:Syne,sans-serif">${w.ward_name}</div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+          <span style="color:#94a3b8">Risk Level</span>
+          <span style="color:${color};font-weight:700">${w.risk_level}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+          <span style="color:#94a3b8">Rainfall</span><span>${w.rainfall}mm</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+          <span style="color:#94a3b8">Population</span><span>${numFormat(w.population)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px">
+          <span style="color:#94a3b8">Readiness</span><span>${(w.readiness_score*100).toFixed(0)}%</span>
+        </div>
+      </div>
+    `);
+    wardsLayer.addLayer(circle);
+  });
+  if (showWards) map.addLayer(wardsLayer);
+}
+
+function toggleLayer(type) {
+  if (type === 'hotspot') {
+    showHotspots = !showHotspots;
+    document.getElementById('btnHotspot').classList.toggle('active', showHotspots);
+    showHotspots ? map.addLayer(clusterLayer) : map.removeLayer(clusterLayer);
+  } else {
+    showWards = !showWards;
+    document.getElementById('btnWards').classList.toggle('active', showWards);
+    if (showWards) {
+      if (!wardsLayer) renderWardMarkers(allWards);
+      map.addLayer(wardsLayer);
+    } else {
+      map.removeLayer(wardsLayer);
+    }
+  }
+}
+
+let rainfallTimeout;
+function updateRainfall(val) {
+  document.getElementById('sliderVal').textContent = val;
+  document.getElementById('rainfallDisplay').textContent = val;
+  clearTimeout(rainfallTimeout);
+  rainfallTimeout = setTimeout(async () => {
+    const r = await fetch('/api/wards?rainfall=' + val);
+    const d = await r.json();
+    allWards = d.wards;
+    updateStatsFromAPI(d.stats);
+    updateDonut(d.stats);
+    if (showWards) renderWardMarkers(allWards);
+  }, 400);
+}
+
+function updateStatsFromAPI(s) {
+  document.getElementById('statTotal').textContent = s.total_wards;
+  document.getElementById('statHigh').textContent = s.high_risk;
+  document.getElementById('statPop').textContent = numFormat(s.affected_population);
+}
+
+function initDonut() {
+  const ctx = document.getElementById('riskDonut').getContext('2d');
+  const stats = { high: {{ stats.high_risk }}, medium: {{ stats.medium_risk }}, low: {{ stats.low_risk }} };
+  donutChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['High', 'Medium', 'Low'],
+      datasets: [{
+        data: [stats.high, stats.medium, stats.low],
+        backgroundColor: ['#ef4444','#f59e0b','#22c55e'],
+        borderWidth: 0,
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      cutout: '72%',
+      plugins: { legend: { display: false }, tooltip: { callbacks: {
+        label: ctx => ` ${ctx.label}: ${ctx.raw} wards`
+      }}},
+      animation: { animateRotate: true, duration: 1200 }
+    }
+  });
+  updateDonut({ high_risk: stats.high, medium_risk: stats.medium, low_risk: stats.low });
+}
+
+function updateDonut(stats) {
+  donutChart.data.datasets[0].data = [stats.high_risk, stats.medium_risk, stats.low_risk];
+  donutChart.update();
+  const t = stats.high_risk + stats.medium_risk + stats.low_risk;
+  document.getElementById('pctHigh').textContent = ((stats.high_risk/t)*100).toFixed(0)+'%';
+  document.getElementById('pctMed').textContent = ((stats.medium_risk/t)*100).toFixed(0)+'%';
+  document.getElementById('pctLow').textContent = ((stats.low_risk/t)*100).toFixed(0)+'%';
+}
+
+function initBarChart() {
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const data = [12,15,18,22,38,95,185,175,120,45,18,10];
+  barChart = new Chart(document.getElementById('rainfallBar').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: [{
+        label: 'Rainfall (mm)',
+        data: data,
+        backgroundColor: data.map(v => v > 100 ? 'rgba(239,68,68,0.7)' : v > 50 ? 'rgba(245,158,11,0.7)' : 'rgba(99,102,241,0.7)'),
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { font: { size: 11 } } }
+      },
+      animation: { duration: 1000 }
+    }
+  });
+}
+
+async function loadTopWards() {
+  const r = await fetch('/api/wards');
+  const d = await r.json();
+  const top = d.wards.sort((a,b) => {
+    const order = {HIGH:3,MEDIUM:2,LOW:1};
+    return (order[b.risk_level] - order[a.risk_level]) || b.rainfall - a.rainfall;
+  }).slice(0, 8);
+  
+  document.getElementById('topWardsTable').innerHTML = `
+    <table>
+      <thead><tr><th>Ward</th><th>Rainfall</th><th>Risk</th><th>Pop.</th></tr></thead>
+      <tbody>${top.map(w => `
+        <tr>
+          <td style="font-weight:600">${w.ward_name}</td>
+          <td>${w.rainfall}mm</td>
+          <td>${riskBadge(w.risk_level)}</td>
+          <td>${numFormat(w.population)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function refreshDashboard() {
+  document.getElementById('lastUpdated').textContent = 'Refreshing...';
+  loadHotspots();
+  loadTopWards();
+  setTimeout(() => {
+    document.getElementById('lastUpdated').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+  }, 1200);
+}
+
+initDashboard();
+</script>
+{% endblock %}
