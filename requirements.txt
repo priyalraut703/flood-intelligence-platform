@@ -1,6 +1,7 @@
 flask
+gunicorn
+setuptools
 pandas
 numpy
 scikit-learn
 joblib
-setuptools
